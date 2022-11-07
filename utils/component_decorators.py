@@ -63,7 +63,7 @@ def data(name):
     """
 
     def data_decorator(data_component):
-        add_data_component(name, component)
+        add_data_component(name, data_component)
         return data_component
 
     return data_decorator
