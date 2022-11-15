@@ -48,7 +48,7 @@ class DataGeneratorPage:
                         dbc.Button("Generate", id="data-generation-generate-data", style={'width': '100%'}),
                         html.Div(id="data-generation-stub", hidden=True)  # placeholder component as a required output
                     ])
-                ])
+                ], style={"padding": "10px"})
             ], style={"overflow": "scroll"})
         ], className="g-0")
 
