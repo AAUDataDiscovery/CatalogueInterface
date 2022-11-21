@@ -80,12 +80,11 @@ class CataloguePage:
             # get the file path that was specified
             file_path = ctx.triggered_id['index']
 
-        file_data = next((x for x in self.catalogue_data.discovery_client.dataframe_file_metadata_pairs if
-                          x[1].file_path == file_path), (pd.DataFrame, {}))
+        file_meta = self.catalogue_data.get_metadata_by_file(file_path)
 
-        header_text = html.H1(f"Displaying file '{file_data[1].file_path}'")
+        header_text = html.H1(f"Displaying file '{file_meta.file_path}'")
 
-        card_layout = self.tab_reference.get(active_tab, self._card_stub)(*file_data)
+        card_layout = self.tab_reference.get(active_tab, self._card_stub)(file_meta)
         return card_layout, file_path, header_text
 
     @staticmethod

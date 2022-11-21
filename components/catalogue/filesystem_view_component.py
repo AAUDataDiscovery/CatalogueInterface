@@ -20,7 +20,7 @@ class FilesystemViewer:
         ])
 
     def _build_filesystem_items(self):
-        self.data_catalogue.load_files()
+        # self.data_catalogue.load_files()
         file_list = self.data_catalogue.get_loaded_files()
         return dbc.ListGroup([
             dbc.ListGroupItem(

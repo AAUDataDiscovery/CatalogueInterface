@@ -14,10 +14,11 @@ class CatalogueFileOverview:
         self.catalogue_data = catalogue_data
 
     @staticmethod
-    def build_table_view(file_data, file_metadata):
+    def build_table_view(file_metadata):
         """
         Create an overview for a given dataframe
         """
+        file_data = next(file_metadata.datagen())
         data_head = file_data.head().to_dict('records')
         numeric_file_metadata = [x for x in file_metadata.columns if isinstance(x, NumericColMetadata)]
         numeric_display_columns = ['name', 'mean', 'maximum', 'minimum']
@@ -47,6 +48,5 @@ class CatalogueFileOverview:
     )
     def download_selected_dataframe(self, n_clicks, file_path):
         if n_clicks:
-            file_data = next((x for x in self.catalogue_data.discovery_client.dataframe_file_metadata_pairs if
-                              x[1].file_path == file_path), (pd.DataFrame, {}))
-            return dcc.send_data_frame(file_data[0].to_csv, file_path)
+            file_data = next(self.catalogue_data.get_metadata_by_file(file_path).datagen())
+            return dcc.send_data_frame(file_data.to_csv, file_path)

@@ -1,10 +1,13 @@
+import copy
 import itertools
+import os
 
-import discovery.utils.dataframe_matcher
+# import discovery.utils.dataframe_matcher
 
 from utils.component_decorators import data
 from discovery import DiscoveryClient
-from discovery.utils.dataframe_matcher import DataFrameMatcher
+from discovery.data_matching.matching_methods import *
+from discovery.data_matching.dataframe_matcher import DataFrameMatcher
 
 
 @data("local_data_catalogue")
@@ -14,77 +17,71 @@ class LocalDataCatalogue:
         self.file_path = "local_data"
         self.load_files()
 
-        # TODO: currently this is hardcoded within the discovery project
         self.match_types = {
-            "Match Identical Values": "match_data_identical_values",
-            "Match Pearson Coefficient": "match_data_pearson_coefficient",
-            "Match Dynamic Time Warping": "match_data_dynamic_time_warping",
-            "Match Column Name (LCS)": "match_name_lcs",
-            "Match Column Name (LVN)": "match_name_levenshtein",
-            "Match Column Name (wordnet)": "match_name_wordnet"
-        }
-        # TODO: workaround logic to enable more robust matching
-        self.name_match_types = {
-            "Match Column Name (LCS)": "match_name_lcs",
-            "Match Column Name (LVN)": "match_name_levenshtein",
-            "Match Column Name (wordnet)": "match_name_wordnet"
-        }
-        self.col_match_types = {
-            "Match Identical Values": "match_data_identical_values",
-            "Match Pearson Coefficient": "match_data_pearson_coefficient",
-            "Match Dynamic Time Warping": "match_data_dynamic_time_warping",
+            "Match Identical Values": MatchIdenticalRows,
+            "Match Pearson Coefficient": MatchDataPearsonCoefficient,
+            "Match Dynamic Time Warping": MatchDataDynamicTimeWarping,
+            "Match Column Name (LCS)": MatchColumnNamesLCS,
+            "Match Column Name (LVN)": MatchColumnNamesLevenshtein,
+            "Match Column Name (wordnet)": MatchColumnNamesWordnet
         }
 
     def load_files(self):
-        """ load in a set of files at the data root path """
-        self.discovery_client.add_files(self.file_path)
-        self.discovery_client.reconstruct_metadata()
+        """ Load in a set of files at the data root path """
+        for root, dirs, files in os.walk(self.file_path):
+            for filename in files:
+                full_path = os.path.join(root, filename)
+                if full_path not in self.discovery_client.loaded_metadata:
+                    self.discovery_client.load_file(full_path)
 
     def get_loaded_files(self):
-        """ get a list of files that are loaded """
-        return self.discovery_client.get_loaded_files()
+        """ Get all metadata that's in memory """
+        return self.discovery_client.loaded_metadata
 
-    def get_dataframe_comparisons(self, comparison_types, comparison_weights, origin_df, target_df):
+    def get_metadata_by_file(self, filename):
+        """ Retrieve metadata from memory by file name """
+        return self.discovery_client.loaded_metadata.get(filename)
+
+    def get_metadata_by_hash(self, metadata_hash):
+        """ Retreive metadata from memory by file hash """
+        for metadata in self.get_loaded_files().values():
+            if metadata.hash == metadata_hash:
+                return metadata
+
+    def get_dataframe_comparisons(self, comparison_types, comparison_weights, origin_meta, target_meta,
+                                  active_origin_columns, active_target_columns):
         """
         Get comparisons between two dataframes
         Apply given weights and average all percentages
+
+        Note that with the datable format, we must preserve row order, but not column order
         """
-        # TODO: dataframe matcher is currently hardcoded to run 2 direct comparisons, forcing us to abstract it away
-        # TODO: until comparisons are sorted out, try to minimise duplicate runs
-        default_name_match = "match_name_lcs"
-        default_col_match = "match_data_identical_values"
-        name_matches = []
-        col_matches = []
-        similarities = {col: {} for col in origin_df.columns}
-        for comparison in comparison_types:
-            if comparison in self.name_match_types:
-                name_matches.append(comparison)
-            col_matches.append(comparison)
 
-        for name_matcher, data_matcher in itertools.zip_longest(name_matches, col_matches):
-            name_matcher = name_matcher or default_name_match
-            data_matcher = data_matcher or default_col_match
-            name_matcher = getattr(DataFrameMatcher, name_matcher)
-            data_matcher = getattr(DataFrameMatcher, data_matcher)
-            matcher = DataFrameMatcher(name_matcher, data_matcher)
+        origin_df = next(origin_meta.datagen()).reindex(columns=active_origin_columns)
+        target_df = next(target_meta.datagen()).reindex(columns=active_target_columns)
 
-            try:
-                for similarity in matcher.match_dataframes(origin_df, target_df):
-                    similarity_column = similarities[similarity['column_a']]
-                    # TODO: name/data matching produces terrible results for averaging
-                    similarity_avg = (similarity['name_confidence'] + similarity['data_confidence']) / 2
-                    similarity_column.setdefault(similarity['column_b'], [similarity_avg]).append(similarity_avg)
+        match_methods = [self.match_types.get(method) for method in comparison_types]
+        df_matcher = DataFrameMatcher()
+        similarities = {}
 
-            except TypeError:
-                continue
+        for origin_column, target_column in itertools.product(active_origin_columns, active_target_columns):
+            similarity = df_matcher.match_columns(
+                methods=match_methods,
+                col_meta1=copy.copy(origin_meta.columns[origin_column]),
+                col_meta2=copy.copy(target_meta.columns[target_column]),
+                series1=origin_df[origin_column],
+                series2=target_df[target_column],
+                metadata1=copy.copy(origin_meta),
+                metadata2=copy.copy(target_meta),
+                weights=comparison_weights
+            )
+            similarities.setdefault(origin_column, {}).update({target_column: round(similarity[1], 2)})
 
-        # format the outputs to be fed into the dash data table
-        data_table_format = [
-            {
-                nested_col_name: round(sum(similarities[col_name][nested_col_name])/len(similarities[col_name][nested_col_name]), 2)
-                for nested_col_name in similarities[col_name]
-            }
-            for col_name in target_df.columns
-        ]
+        return similarities
 
-        return data_table_format
+    def update_relationships(self, origin_file_name, target_file_name, origin_col_name, target_col_name, certainty):
+        target_metadata = self.get_metadata_by_file(target_file_name)
+
+        origin_metadata = self.discovery_client.loaded_metadata[origin_file_name]
+
+        origin_metadata.columns[origin_col_name].add_relationship(certainty, target_metadata.hash, target_col_name)
