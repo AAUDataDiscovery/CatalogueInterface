@@ -1,7 +1,6 @@
 import os
 
 from utils.component_decorators import data
-from utils.directory_tree_visual import DisplayablePath
 from discovery.utils.datagen import FakeDataGen
 
 
@@ -11,10 +10,7 @@ class LocalDataGenerator:
         self.local_data_path = "local_data"
         self.datagen = FakeDataGen()
 
-    def get_directory_tree(self):
-        return DisplayablePath.make_tree(
-            self.local_data_path
-        )
+
 
     def generate_fake_data(self, *generation_args):
         """

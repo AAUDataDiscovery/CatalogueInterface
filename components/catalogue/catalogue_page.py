@@ -80,11 +80,11 @@ class CataloguePage:
             # get the file path that was specified
             file_path = ctx.triggered_id['index']
 
-        file_meta = self.catalogue_data.get_metadata_by_file(file_path)
+        file_catalogue = self.catalogue_data.get_metadata_by_file(file_path)
 
-        header_text = html.H1(f"Displaying file '{file_meta.file_path}'")
+        header_text = html.H1(f"Displaying file '{file_catalogue.get_metadata().data_manifest['path']}'")
 
-        card_layout = self.tab_reference.get(active_tab, self._card_stub)(file_meta)
+        card_layout = self.tab_reference.get(active_tab, self._card_stub)(file_catalogue)
         return card_layout, file_path, header_text
 
     @staticmethod

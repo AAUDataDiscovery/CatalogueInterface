@@ -36,7 +36,7 @@ class App:
         """
         When the app instance is called, this will run
         """
-        self.app.run_server(debug=False, port=port, dev_tools_hot_reload=False, use_reloader=False)
+        self.app.run_server(debug=True, port=port, dev_tools_hot_reload=False, use_reloader=False)
 
 
 if __name__ == "__main__":

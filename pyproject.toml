@@ -9,7 +9,7 @@ dependencies = [
     "dash>=2.6.2",
     "pandas>=1.5.0",
     "setuptools>=65.4.1",
-    "datacataloguesystem>=0.0.2",
+    "DataCatalogueSystem>=1.0.1",
     "dash-bootstrap-components>=1.2.1",
 ]
 requires-python = ">=3.10"

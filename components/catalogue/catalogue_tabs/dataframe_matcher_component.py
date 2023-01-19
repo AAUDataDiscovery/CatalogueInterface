@@ -17,21 +17,22 @@ class CatalogueDataframeMatcher:
         # As there are a set amount of colours, a conversion must be made from a percentage to the required gradient
         self.colour_step = 100 / len(self.table_colours)
 
-    def build_view(self, file_metadata):
+    def build_view(self, file_catalogue):
         """
         Build the main view for the selected file
         """
-        file_data = next(file_metadata.datagen())
+        file_data = file_catalogue.get_data()
+        file_metadata = file_catalogue.get_metadata()
         data_head = file_data.head().to_dict('records')
         return html.Div([
             dcc.Dropdown([
-                file_path for file_path in self.catalogue_data.get_loaded_files()
-                if file_path != file_metadata.file_path
+                file_path for file_path in self.catalogue_data.file_catalogue_ref
+                if file_path != file_metadata.data_manifest['path']
             ],
                 id="catalogue-file-comparison-choice"
             ),
 
-            html.H2(file_metadata.file_path),
+            html.H2(file_metadata.data_manifest['path']),
             dash_table.DataTable(
                 data_head,
                 columns=[{
@@ -104,18 +105,22 @@ class CatalogueDataframeMatcher:
         Display the head of file that has been chosen as a target for comparison
         If none is specified (or the field is cleared) ask the user to specify
         """
-        file_meta = self.catalogue_data.discovery_client.loaded_metadata.get(file_path)
+        if file_path is None:
+            return dash.no_update
+
+        file_catalogue = self.catalogue_data.get_metadata_by_file(file_path)
+        file_meta = file_catalogue.get_metadata()
+        file_data = file_catalogue.get_data()
 
         if file_meta is None:
             return html.Div(
                 html.H2("Specify a file to compare with")
             )
 
-        file_data = next(file_meta.datagen())
         data_head = file_data.head().to_dict('records')
 
         return html.Div([
-            html.H2(file_meta.file_path),
+            html.H2(file_meta.data_manifest['path']),
             dash_table.DataTable(
                 data_head,
                 columns=[{
@@ -183,6 +188,8 @@ class CatalogueDataframeMatcher:
     def update_comparison_percentage_data(self, comparison_types, comparison_weights, origin_file_path,
                                           target_file_path,
                                           target_hidden_columns, origin_hidden_columns, target_columns, origin_columns):
+        if not target_file_path:
+            return dash.no_update
         comparison_type_names = [x['id']['index'] for x in dash.ctx.inputs_list[0] if x.get('value', False)]
         comparison_weight_names = [x['id']['index'] for x in dash.ctx.inputs_list[1] if x.get('value', False)]
 
